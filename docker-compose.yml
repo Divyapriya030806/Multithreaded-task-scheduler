@@ -1,0 +1,10 @@
+services:
+  task-scheduler:
+    build: .
+    ports:
+      - "8092:8080"
+    container_name: task-scheduler-app
+    restart: unless-stopped
+    environment:
+      - JAVA_OPTS=-Xmx512m -Xms256m
+

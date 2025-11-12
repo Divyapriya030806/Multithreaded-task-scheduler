@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Task Scheduler - Multi-Threaded</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+            min-height: 100vh;
+            padding: 20px;
+            animation: backgroundShift 10s ease infinite;
+        }
+
+        @keyframes backgroundShift {
+            0%, 100% { background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%); }
+            50% { background: linear-gradient(135deg, #f093fb 0%, #667eea 50%, #764ba2 100%); }
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+            animation: slideIn 0.5s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        h1 {
+            color: #667eea;
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.02); }
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+        }
+
+        .form-container {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 25px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .form-container:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 40px rgba(102, 126, 234, 0.4);
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            color: white;
+            margin-bottom: 8px;
+            font-weight: 600;
+            font-size: 1.1em;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1em;
+            transition: all 0.3s ease;
+            background: white;
+            color: #333;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.5);
+            transform: scale(1.02);
+        }
+
+        .button-group {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            padding: 12px 30px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            color: white;
+            flex: 1;
+            min-width: 150px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+        }
+
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #38ef7d 0%, #11998e 100%);
+            transform: translateY(-3px) scale(1.05);
+            box-shadow: 0 6px 20px rgba(17, 153, 142, 0.4);
+        }
+
+        .btn-primary:active {
+            transform: translateY(-1px) scale(1.02);
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, #ee0979 0%, #ff6a00 100%);
+        }
+
+        .btn-secondary:hover {
+            background: linear-gradient(135deg, #ff6a00 0%, #ee0979 100%);
+            transform: translateY(-3px) scale(1.05);
+            box-shadow: 0 6px 20px rgba(238, 9, 121, 0.4);
+        }
+
+        .btn-secondary:active {
+            transform: translateY(-1px) scale(1.02);
+        }
+
+        .tasks-container {
+            margin-top: 30px;
+        }
+
+        .tasks-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .tasks-header h2 {
+            color: #667eea;
+            font-size: 1.8em;
+        }
+
+        .refresh-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            color: white;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .refresh-btn:hover {
+            transform: rotate(180deg) scale(1.1);
+        }
+
+        .task-list {
+            display: grid;
+            gap: 15px;
+        }
+
+        .task-card {
+            background: white;
+            border-left: 5px solid #667eea;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+            animation: fadeIn 0.5s ease-out;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .task-card:hover {
+            transform: translateX(5px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+        }
+
+        .task-card.scheduled {
+            border-left-color: #f093fb;
+        }
+
+        .task-card.running {
+            border-left-color: #4facfe;
+            animation: pulse-border 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse-border {
+            0%, 100% { border-left-width: 5px; }
+            50% { border-left-width: 8px; }
+        }
+
+        .task-card.completed {
+            border-left-color: #38ef7d;
+        }
+
+        .task-card.cancelled {
+            border-left-color: #ee0979;
+            opacity: 0.7;
+        }
+
+        .task-info {
+            flex: 1;
+        }
+
+        .task-name {
+            font-size: 1.3em;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .task-details {
+            color: #666;
+            font-size: 0.9em;
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .task-status {
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 600;
+            text-transform: uppercase;
+            display: inline-block;
+        }
+
+        .status-scheduled {
+            background: #f093fb;
+            color: white;
+        }
+
+        .status-running {
+            background: #4facfe;
+            color: white;
+            animation: blink 1s ease-in-out infinite;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+
+        .status-completed {
+            background: #38ef7d;
+            color: white;
+        }
+
+        .status-cancelled {
+            background: #ee0979;
+            color: white;
+        }
+
+        .task-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn-cancel {
+            background: #ee0979;
+            color: white;
+            padding: 8px 15px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            font-size: 0.9em;
+        }
+
+        .btn-cancel:hover {
+            background: #c40663;
+            transform: scale(1.1);
+        }
+
+        .btn-cancel:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .message {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            text-align: center;
+            font-weight: 600;
+            animation: slideDown 0.3s ease-out;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .message.success {
+            background: #38ef7d;
+            color: white;
+        }
+
+        .message.error {
+            background: #ee0979;
+            color: white;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+            font-size: 1.2em;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 20px;
+            }
+
+            h1 {
+                font-size: 2em;
+            }
+
+            .button-group {
+                flex-direction: column;
+            }
+
+            button {
+                width: 100%;
+            }
+
+            .task-card {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Task Scheduler</h1>
+        <p class="subtitle">Multi-Threaded Task Management System</p>
+
+        <div id="message"></div>
+
+        <div class="form-container">
+            <div class="form-group">
+                <label for="taskName">Task Name</label>
+                <input type="text" id="taskName" placeholder="Enter task name" value="Sample Task">
+            </div>
+            <div class="form-group">
+                <label for="taskType">Task Type</label>
+                <select id="taskType">
+                    <option value="simple">Simple Task</option>
+                    <option value="complex">Complex Task</option>
+                    <option value="priority">Priority Task</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="delay">Delay (seconds)</label>
+                <input type="number" id="delay" placeholder="Delay in seconds" value="5" min="1" max="60">
+            </div>
+            <div class="button-group">
+                <button class="btn-primary" onclick="scheduleTask()">Schedule Task</button>
+                <button class="btn-secondary" onclick="refreshTasks()">Refresh Tasks</button>
+            </div>
+        </div>
+
+        <div class="tasks-container">
+            <div class="tasks-header">
+                <h2>📋 Scheduled Tasks</h2>
+                <button class="refresh-btn" onclick="refreshTasks()">🔄 Refresh</button>
+            </div>
+            <div id="taskList" class="task-list">
+                <div class="empty-state">No tasks scheduled yet. Create your first task!</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let refreshInterval;
+
+        function showMessage(text, type = 'success') {
+            const messageDiv = document.getElementById('message');
+            messageDiv.textContent = text;
+            messageDiv.className = `message ${type}`;
+            messageDiv.style.display = 'block';
+            setTimeout(() => {
+                messageDiv.style.display = 'none';
+            }, 3000);
+        }
+
+        async function scheduleTask() {
+            const taskName = document.getElementById('taskName').value;
+            const taskType = document.getElementById('taskType').value;
+            const delay = document.getElementById('delay').value;
+
+            if (!taskName.trim()) {
+                showMessage('Please enter a task name', 'error');
+                return;
+            }
+
+            try {
+                const params = new URLSearchParams({
+                    name: taskName,
+                    type: taskType,
+                    delay: delay
+                });
+
+                const response = await fetch('/api/schedule', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: params.toString()
+                });
+
+                const data = await response.json();
+                if (response.ok) {
+                    showMessage(`Task "${taskName}" scheduled successfully!`, 'success');
+                    document.getElementById('taskName').value = '';
+                    refreshTasks();
+                } else {
+                    showMessage(data.error || 'Failed to schedule task', 'error');
+                }
+            } catch (error) {
+                showMessage('Error scheduling task: ' + error.message, 'error');
+            }
+        }
+
+        async function cancelTask(taskId) {
+            try {
+                const params = new URLSearchParams({ taskId: taskId });
+                const response = await fetch('/api/cancel', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: params.toString()
+                });
+
+                const data = await response.json();
+                if (response.ok) {
+                    showMessage('Task cancelled successfully!', 'success');
+                    refreshTasks();
+                } else {
+                    showMessage(data.error || 'Failed to cancel task', 'error');
+                }
+            } catch (error) {
+                showMessage('Error cancelling task: ' + error.message, 'error');
+            }
+        }
+
+        async function refreshTasks() {
+            try {
+                const response = await fetch('/api/tasks');
+                const data = await response.json();
+
+                const taskList = document.getElementById('taskList');
+                if (data.tasks && data.tasks.length > 0) {
+                    taskList.innerHTML = data.tasks.map(task => {
+                        const statusClass = task.status.toLowerCase();
+                        const canCancel = task.status === 'SCHEDULED' || task.status === 'RUNNING';
+                        const scheduledDate = new Date(task.scheduledAt).toLocaleString();
+                        const completedDate = task.completedAt ? new Date(task.completedAt).toLocaleString() : '';
+
+                        return `
+                            <div class="task-card ${statusClass}">
+                                <div class="task-info">
+                                    <div class="task-name">${escapeHtml(task.name)}</div>
+                                    <div class="task-details">
+                                        <span><strong>ID:</strong> ${task.id}</span>
+                                        <span><strong>Type:</strong> ${task.type}</span>
+                                        <span><strong>Scheduled:</strong> ${scheduledDate}</span>
+                                        ${completedDate ? `<span><strong>Completed:</strong> ${completedDate}</span>` : ''}
+                                        <span class="task-status status-${statusClass}">${task.status}</span>
+                                    </div>
+                                </div>
+                                <div class="task-actions">
+                                    ${canCancel ? `<button class="btn-cancel" onclick="cancelTask('${task.id}')">Cancel</button>` : ''}
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                } else {
+                    taskList.innerHTML = '<div class="empty-state">No tasks scheduled yet. Create your first task!</div>';
+                }
+            } catch (error) {
+                showMessage('Error fetching tasks: ' + error.message, 'error');
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Auto-refresh every 2 seconds
+        function startAutoRefresh() {
+            refreshInterval = setInterval(refreshTasks, 2000);
+        }
+
+        function stopAutoRefresh() {
+            if (refreshInterval) {
+                clearInterval(refreshInterval);
+            }
+        }
+
+        // Allow Enter key to submit
+        document.getElementById('taskName').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                scheduleTask();
+            }
+        });
+
+        document.getElementById('delay').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                scheduleTask();
+            }
+        });
+
+        // Start auto-refresh on page load
+        window.addEventListener('load', function() {
+            refreshTasks();
+            startAutoRefresh();
+        });
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', function() {
+            stopAutoRefresh();
+        });
+    </script>
+</body>
+</html>
+
